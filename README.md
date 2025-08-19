@@ -38,7 +38,10 @@ The insights can help Travel Tide improve customer retention, boost engagement, 
 
 <img width="639" height="439" alt="Bildschirmfoto 2025-07-24 um 12 32 25" src="https://github.com/user-attachments/assets/f4ce4c44-5371-4e90-9a84-9deaac5b0641" />
 
+
+
 📖 Learnings
+
 End-to-end project workflow from SQL data extraction to business presentation
 Application of clustering and statistical testing in a real-world scenario
 Translating data insights into clear business recommendations
