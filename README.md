@@ -29,15 +29,15 @@ The insights can help Travel Tide improve customer retention, boost engagement, 
 
 📂 Repository Structure
 
-├── data/             # Sample datasets (anonymized / synthetic)
+├ data/             # Sample datasets (anonymized / synthetic)
 
-├── notebooks/        # Jupyter notebooks with analysis & clustering
+├ notebooks/        # Jupyter notebooks with analysis & clustering
 
-├── sql/              # SQL queries used for data exploration
+├ sql/              # SQL queries used for data exploration
 
-├── visuals/          # Graphs, cluster plots & dashboards
+├ visuals/          # Graphs, cluster plots & dashboards
 
-└── README.md         # Project documentation
+└ README.md         # Project documentation
 
 
 📸 Preview
