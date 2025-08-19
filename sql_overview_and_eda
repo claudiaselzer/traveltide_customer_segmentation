@@ -1,0 +1,113 @@
+/*
+  Query: Overview & Exploratory Data Analysis (EDA)
+  Description:
+    This script provides general SQL queries for exploring the Travel Tide dataset.
+    It includes table overviews, quick data previews, and first analytical insights
+    about user activity, travel behavior, and booking patterns.
+
+  Sections:
+    1. Quick overview of tables (users, bookings, hotels, flights)
+    2. User activity (total sessions, last seen)
+    3. Average travel behavior (average stay, price per room)
+    4. CTE pipelines:
+       - Active users with more than 7 sessions (last 12 months)
+       - Valid hotel stays (nights >= 0)
+       - Valid flights (seats > 0)
+    5. Aggregated metrics: sessions, hotel trips, flights booked,
+       average nights, cancellations, cancellation rate
+
+  Usage:
+    These queries are used for initial exploration, validation of data quality,
+    and deriving first insights before deeper user- or session-level modeling.
+*/
+
+
+
+
+# overview_queries
+
+- - Quick OVERVIEW of Tables
+--> with 'View Data'
+- - or
+SELECT * FROM users LIMIT 5;
+SELECT * FROM bookings LIMIT 5;
+SELECT * FROM hotels LIMIT 5;
+SELECT * FROM flights LIMIT 5;
+
+---
+
+## ------------- EDA ---------------------------
+
+- --- 1. How active are the users
+-- counting of sessions
+-- last seen / session
+
+SELECT 	user_id,
+COUNT(session_id) AS total_sessions,
+MAX(session_end) AS last_seen
+FROM sessions
+GROUP BY user_id;
+
+- --- 2. Average travel behavior
+-- average days of stay
+-- travel frequency
+
+SELECT 	s.user_id,
+AVG(nights) AS avg_stay,
+ROUND(AVG(hotel_per_room_usd),2) AS avg_price_usd
+FROM sessions s
+LEFT JOIN hotels h
+ON s.trip_id = h.trip_id
+GROUP BY user_id;
+
+---
+
+---
+
+---- CTE 1 - active User with more than 7 Sessions
+---- active User >> in the last year // since 28-07-2022
+
+WITH active_users AS (
+SELECT user_id
+FROM sessions
+WHERE session_end >= '2022-07-28'
+GROUP BY user_id
+HAVING COUNT(*) > 7
+),
+
+- --- CTE2 with valid stays in hotels (nights >= 0)
+valid_hotels AS (
+SELECT *
+FROM hotels
+WHERE
+nights >= 0
+AND check_out_time > check_in_time
+),
+- --- CTE3 with valid booked seats in a flight
+
+valid_flights AS (
+SELECT *
+FROM flights
+WHERE seats > 0
+)
+
+SELECT
+au.user_id,
+COUNT(DISTINCT s.session_id) AS total_sessions,
+COUNT(DISTINCT vh.trip_id) AS hotel_trips,
+ROUND(AVG(vh.nights), 1) AS avg_nights,
+ROUND(AVG(vh.hotel_per_room_usd), 2) AS avg_price_per_room,
+COUNT(DISTINCT vf.flight_id) AS flights_booked,
+COUNT(*) FILTER (WHERE b.status = 'cancelled') AS cancellations,
+COUNT(s.b) AS total_bookings,
+ROUND(
+COUNT(*) FILTER (WHERE b.status = 'cancelled') * 1.0
+/ NULLIF(COUNT(b.booking_id), 0), 2
+) AS cancellation_rate
+FROM
+active_users au
+LEFT JOIN sessions s ON s.user_id = au.user_id
+LEFT JOIN valid_hotels vh ON vh.trip_id = s.trip_id
+LEFT JOIN valid_flights vf ON vf.trip_id = s.trip_id
+LEFT JOIN sessions s ON s.user_id = au.user_id
+GROUP BY au.user_id;
