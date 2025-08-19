@@ -1,14 +1,23 @@
 /*
-  Query: user_level_data 
-  Description: Builds user-level profiles combining demographics, 
-               session behavior, booking activity, and loyalty metrics.
-  Usage: Used to prepare features for clustering and customer segmentation.
-  Author: Claudia
-  Date: 2025-08-19
+  Query: User-Level Profile Creation
+  Description:
+    This SQL script aggregates demographic information, session activity,
+    booking behavior, loyalty metrics, discount usage, and conversion rates
+    to build comprehensive user-level profiles. These profiles are designed
+    to capture both behavioral and demographic dimensions of each customer.
+
+  Steps:
+    1. Filter sessions within the last 12 months
+    2. Select users with at least one booking
+    3. Aggregate demographics (age, gender, family, location)
+    4. Assign age groups and customer lifetime categories
+    5. Calculate engagement metrics (sessions, duration, clicks)
+    6. Add booking, conversion, cancellation, and discount behavior
+
+  Usage:
+    The resulting dataset is used as input for clustering,
+    customer segmentation, and loyalty program design.
 */
-
-
-
 
 -- Filter sessions within the past 12 months
 WITH filtered_sessions AS (
