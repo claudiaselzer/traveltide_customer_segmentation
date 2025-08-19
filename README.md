@@ -12,6 +12,7 @@ The project focuses on customer segmentation, profiling, and retention strategie
 - Develop recommendations for a loyalty program to increase retention and reactivation
 
 🛠️ Tools & Technologies
+
 SQL – Data extraction and preparation
 Python (Pandas, Scikit-learn, Matplotlib, Seaborn) – Data analysis, visualization & clustering
 Statistics – Hypothesis testing and insights validation
