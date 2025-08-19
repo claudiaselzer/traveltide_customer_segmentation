@@ -1,5 +1,4 @@
 # traveltide_customer_segmentation
-This project analyzes customer data from a fictional travel company to identify meaningful customer segments and provide data-driven recommendations for a loyalty program. Using SQL, Python, and statistical methods, cluster analysis was applied to create customer profiles and develop strategies to increase customer retention and reactivation.
 
 📌 Project Overview
 Travel Tide is a fictional travel company dataset used to explore customer behavior and design a data-driven loyalty program.
