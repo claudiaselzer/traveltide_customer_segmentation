@@ -28,11 +28,13 @@ Tableau – Interactive dashboards for storytelling
 The insights can help Travel Tide improve customer retention, boost engagement, and maximize lifetime value through targeted loyalty incentives and reactivation strategies.
 
 📂 Repository Structure
+
 ├── data/             # Sample datasets (anonymized / synthetic)
 ├── notebooks/        # Jupyter notebooks with analysis & clustering
 ├── sql/              # SQL queries used for data exploration
 ├── visuals/          # Graphs, cluster plots & dashboards
 └── README.md         # Project documentation
+
 
 📸 Preview
 
