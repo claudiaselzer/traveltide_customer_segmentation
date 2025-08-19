@@ -1,0 +1,203 @@
+/*
+  Query: Session-Level Data Preparation
+  Description:
+    This SQL script builds a session-level dataset by filtering active users,
+    cleaning booking data, and joining flights, hotels, and user profiles.
+    It combines demographics, session behavior, booking activity, 
+    discount usage, and trip details to prepare features for segmentation 
+    and further analysis.
+
+  Steps:
+    1. Filter sessions (last 7 months)
+    2. Identify active users (>7 sessions)
+    3. Clean hotel data (valid bookings only)
+    4. Build user-level profiles (demographics, loyalty, behavior)
+    5. Join sessions with flights, hotels, and user profiles
+    6. Output enriched session-level dataset for analysis
+
+  Usage:
+    Used for detailed session-based analysis and as input for 
+    customer segmentation models.
+*/
+
+
+
+
+
+    -- Sessions between period of 7 month
+WITH filtered_sessions AS (
+    SELECT *
+    FROM sessions
+    WHERE session_start BETWEEN '2023-01-04' AND '2023-07-29'
+),
+
+-- Active Users with more 7 Sessions
+active_users AS (
+    SELECT user_id
+    FROM filtered_sessions
+    GROUP BY user_id
+    HAVING COUNT(session_id) > 7
+),
+
+-- Only sessions with active Users
+filtered_active_user AS (
+    SELECT s.*
+    FROM filtered_sessions s
+    JOIN active_users a ON s.user_id = a.user_id
+),
+
+-- Only valid hotelbookings
+clean_hotels AS (
+    SELECT *,
+        SPLIT_PART(hotel_name, ' - ', 1) AS hotel_name_clean,
+        SPLIT_PART(hotel_name, ' - ', 2) AS hotel_city
+    FROM hotels
+    WHERE nights > 0
+),
+
+-- Userprofil with session-, booking- and discountbehavior
+user_profile AS (
+    SELECT
+        u.user_id,
+        u.gender,
+        u.birthdate,
+        DATE_PART('year', AGE(u.birthdate)) AS age,
+        -- AgeGroup
+        CASE
+            WHEN DATE_PART('year', AGE(u.birthdate)) < 18 THEN 'Teenager (<18)'
+            WHEN DATE_PART('year', AGE(u.birthdate)) BETWEEN 18 AND 24 THEN 'Young Adults (18-24)'
+            WHEN DATE_PART('year', AGE(u.birthdate)) BETWEEN 25 AND 34 THEN 'Early Career (25-34)'
+            WHEN DATE_PART('year', AGE(u.birthdate)) BETWEEN 35 AND 49 THEN 'Established (35-49)'
+            WHEN DATE_PART('year', AGE(u.birthdate)) BETWEEN 50 AND 64 THEN 'Prime Leisure (50-64)'
+            ELSE 'Senior Explorer (65+)'
+        END AS age_group,
+        
+        -- Lifetime in Month
+        DATE_PART('year', AGE(DATE '2023-07-29', u.sign_up_date)) * 12 +
+        DATE_PART('month', AGE(DATE '2023-07-29', u.sign_up_date)) AS customer_since_months,
+        CASE 
+            WHEN (DATE_PART('year', AGE(DATE '2023-07-29', u.sign_up_date)) * 12 +
+                  DATE_PART('month', AGE(DATE '2023-07-29', u.sign_up_date))) < 6 THEN 'New (<6 months)'
+            WHEN (DATE_PART('year', AGE(DATE '2023-07-29', u.sign_up_date)) * 12 +
+                  DATE_PART('month', AGE(DATE '2023-07-29', u.sign_up_date))) < 24 THEN 'Established (6–24 months)'
+            ELSE 'Loyal (>2 years)'
+        END AS customer_lifetime_group,
+
+        -- Session Behavior
+        COUNT(s.session_id) AS total_sessions,
+        ROUND(AVG(EXTRACT(EPOCH FROM (s.session_end - s.session_start)) / 60), 2) 
+  							AS avg_session_minutes,
+        ROUND(SUM(s.page_clicks)::decimal / COUNT(s.session_id), 2) AS avg_clicks_per_session,
+	
+        -- Booking Behavior
+        SUM(CASE WHEN s.flight_booked THEN 1 ELSE 0 END) AS total_flight_bookings,
+        SUM(CASE WHEN s.hotel_booked THEN 1 ELSE 0 END) AS total_hotel_bookings,
+        SUM(CASE WHEN s.flight_booked AND s.hotel_booked THEN 1 ELSE 0 END) 
+  							AS total_flight_hotel_bookings,
+  	
+  
+				-- Conversionrate
+  			SUM(CASE WHEN s.flight_booked OR s.hotel_booked THEN 1 ELSE 0 END) 
+  							AS converted_sessions, 
+  			ROUND(100.0 * SUM(CASE WHEN s.flight_booked OR s.hotel_booked THEN 1 ELSE 0 END) / COUNT(s.session_id), 2) 
+  							AS conversion_rate_percent,
+  
+        -- Cancellation Behavior
+        SUM(CASE WHEN s.cancellation THEN 1 ELSE 0 END) AS total_cancellations,
+        ROUND(100.0 * SUM(CASE WHEN s.cancellation THEN 1 ELSE 0 END) / COUNT(s.session_id), 2) AS cancellation_rate_percent,
+
+        -- Discount Behavior
+        SUM(COALESCE(s.flight_discount_amount, 0) + COALESCE(s.hotel_discount_amount, 0)) AS total_discount_used,
+        CASE 
+            WHEN SUM(COALESCE(s.flight_discount_amount, 0) + COALESCE(s.hotel_discount_amount, 0)) > 0 THEN TRUE
+            ELSE FALSE
+        END AS used_discount,
+
+        -- Demographic Data
+        u.married,
+        u.has_children,
+        u.home_country,
+        u.home_city,
+        u.sign_up_date
+
+    FROM users u
+    JOIN filtered_active_user s ON u.user_id = s.user_id
+    GROUP BY u.user_id, u.gender, u.birthdate, u.married, u.has_children, u.home_country, u.home_city, u.sign_up_date
+),
+
+-- Join Sessions with Hotel, Flights and UserProfil
+joining_data AS (
+    SELECT
+        s.session_id,
+        s.user_id,
+        s.session_start,
+        s.session_end,
+        EXTRACT(EPOCH FROM (s.session_end - s.session_start)) / 60.0 AS session_duration_minutes,
+        s.page_clicks,
+
+        -- Session KPIs
+        u.total_sessions,
+        u.avg_session_minutes,
+        u.avg_clicks_per_session,
+
+        -- Booking & Discount
+        s.flight_booked,
+        s.hotel_booked,
+        s.cancellation,
+        s.flight_discount,
+        s.hotel_discount,
+        COALESCE(s.flight_discount_amount, 0) AS flight_discount_amount,
+        COALESCE(s.hotel_discount_amount, 0) AS hotel_discount_amount,
+
+        -- Flightdetails
+        f.trip_id,
+        f.origin_airport,
+        f.destination_airport,
+        f.destination_airport_lat,
+        f.destination_airport_lon,
+        f.departure_time,
+        f.return_time,
+        f.checked_bags,
+        f.seats,
+        f.base_fare_usd AS flight_price,
+
+        -- Hoteldetails
+        h.hotel_name_clean,
+        h.hotel_city,
+        h.rooms,
+        h.hotel_per_room_usd AS hotel_price,
+        h.nights,
+
+        -- Total costs
+        (COALESCE(f.base_fare_usd, 0) + COALESCE(h.hotel_per_room_usd, 0) * COALESCE(h.nights, 0)) AS total_booking_price,
+
+        -- Profilinformation
+        u.age, u.gender, u.age_group, u.customer_since_months, u.customer_lifetime_group,
+        u.total_flight_bookings, u.total_hotel_bookings, u.total_flight_hotel_bookings, u.conversion_rate_percent,
+        u.total_cancellations, u.cancellation_rate_percent, u.total_discount_used,
+        u.used_discount, u.married, u.has_children, u.home_country, u.home_city,
+
+        -- KPIs / Segmentation
+        CASE WHEN s.flight_booked or s.hotel_booked THEN 1 ELSE 0 END AS has_booked,
+        CASE 
+            WHEN s.flight_booked AND s.hotel_booked THEN 'flight_hotel_combo'
+            WHEN s.flight_booked THEN 'flight_only'
+            WHEN s.hotel_booked THEN 'hotel_only'
+            ELSE 'unbooked'
+        END AS booking_type,
+        CASE 
+            WHEN COALESCE(h.nights, 0) >= 12 THEN 'long_trip'
+  					WHEN COALESCE(h.nights, 0) > 6 THEN 'week_trip'
+            WHEN COALESCE(h.nights, 0) > 0 THEN 'short_trip'
+            ELSE 'no_valid_stay'
+        END AS travel_duration
+
+    FROM filtered_active_user s
+    JOIN user_profile u ON s.user_id = u.user_id
+    LEFT JOIN flights f ON s.trip_id = f.trip_id
+    LEFT JOIN clean_hotels h ON s.trip_id = h.trip_id
+)
+
+-- final result 
+SELECT *
+FROM joining_data;
